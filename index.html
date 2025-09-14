@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mystery Box Spinner</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+        :root {
+            --primary-color: #6a11cb;
+            --secondary-color: #2575fc;
+            --background-color: #f0f2f5;
+            --text-color: #333;
+            --light-text-color: #fff;
+            --card-bg-color: #ffffff;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --border-radius: 15px;
+        }
+
+        html {
+            box-sizing: border-box;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            height: 100vh;
+            background-color: var(--background-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .screen {
+            display: none;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            flex-direction: column;
+        }
+        
+        .screen.active {
+            display: flex;
+        }
+        
+        /* General Components */
+        .btn {
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow);
+        }
+        .btn-primary { background: linear-gradient(45deg, var(--primary-color), var(--secondary-color)); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+        .btn-secondary { background-color: #e9ecef; color: var(--text-color); }
+        .btn:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: var(--card-bg-color);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        .header .resources { display: flex; gap: 15px; font-weight: 600; }
+        .header .resource-item { display: flex; align-items: center; gap: 5px; }
+
+        .main-content {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .card {
+            background: var(--card-bg-color);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+        }
+        .card h3 { margin-top: 0; color: var(--primary-color); }
+
+        .nav-bar {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            background: var(--card-bg-color);
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        .nav-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 10px; color: #aaa; }
+        .nav-btn.active { color: var(--primary-color); }
+
+
+        /* Loading Screen */
+        #loading-screen {
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: var(--light-text-color); text-align: center;
+        }
+        #loading-screen h1 { font-size: 2.5em; margin-bottom: 20px; }
+        .progress-bar-container { width: 80%; background-color: rgba(255, 255, 255, 0.3); border-radius: 25px; overflow: hidden; }
+        .progress-bar { width: 0%; height: 20px; background-color: #4caf50; text-align: center; line-height: 20px; color: white; transition: width 0.4s ease; }
+
+
+        /* Login Screen */
+        #login-screen {
+            justify-content: center;
+            align-items: center;
+            padding: 20px; text-align: center;
+        }
+        #login-screen h1 { color: var(--primary-color); }
+        #login-button { background-color: #4285F4; color: white; display: flex; align-items: center; gap: 10px; }
+        #login-button:hover { background-color: #357ae8; }
+
+        /* Main App Screen */
+        #app-screen { padding: 0; }
+        .spin-area { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .wheel-container { position: relative; width: 300px; height: 300px; margin-bottom: 30px; }
+        .wheel { width: 100%; height: 100%; background-image: url('https://i.ibb.co/b3pXJtB/wheel.png'); background-size: cover; border-radius: 50%; transition: transform 5s cubic-bezier(0.25, 0.1, 0.25, 1); border: 5px solid #fff; box-shadow: 0 0 20px rgba(0,0,0,0.2); }
+        .pointer { position: absolute; width: 0; height: 0; border-left: 20px solid transparent; border-right: 20px solid transparent; border-top: 30px solid #ff4757; top: -10px; z-index: 10; }
+        .spin-button { padding: 15px 40px; font-size: 1.2em; font-weight: 700; color: white; background: linear-gradient(45deg, #f83600, #f9d423); }
+        .extra-spin-button { margin-top: 15px; background: none; border: none; color: var(--primary-color); font-weight: 600; cursor: pointer; box-shadow: none; }
+        .streak-days { display: flex; justify-content: center; gap: 10px; margin-top: 15px; }
+        .day { width: 35px; height: 35px; border-radius: 50%; background-color: #e0e0e0; display: flex; justify-content: center; align-items: center; font-weight: 600; }
+        .day.active { background-color: #ffd700; color: #333; }
+
+        /* Leaderboard & Redeem Screens */
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
+        .list-item:last-child { border-bottom: none; }
+        .list-item .rank { font-weight: 700; width: 30px; }
+        .list-item .name { flex-grow: 1; margin: 0 10px; }
+        .list-item .coins { font-weight: 600; }
+        .redeem-tier .details { flex-grow: 1; }
+        
+        /* Profile Screen */
+        #profile-info .info-item { display: flex; justify-content: space-between; padding: 8px 0; }
+        #profile-info .info-item span:first-child { font-weight: 600; }
+        .history-item .status-pending { color: var(--warning-color); }
+        .history-item .status-approved { color: var(--success-color); }
+        .history-item .status-rejected { color: var(--danger-color); }
+        .gift-code { background: #eee; padding: 5px; border-radius: 5px; font-family: monospace; }
+        
+        /* Admin Panel */
+        #admin-panel { background-color: #2c3e50; color: white; }
+        #admin-panel .main-content { padding: 15px; }
+        #admin-panel h2, #admin-panel h3 { color: #ecf0f1; border-bottom: 1px solid #34495e; padding-bottom: 10px; }
+        .admin-filter-btns { margin-bottom: 15px; }
+        .admin-request-item { background: #34495e; padding: 15px; margin-bottom: 10px; border-radius: 8px; }
+        .admin-request-item p { margin: 5px 0; }
+        .admin-actions .btn { margin-right: 10px; }
+        .btn-approve { background: var(--success-color); color: white; }
+        .btn-reject { background: var(--danger-color); color: white; }
+        .user-inspection { margin-top: 10px; background: #2c3e50; padding: 10px; border-radius: 5px; border: 1px solid #34495e; }
+        #admin-login-prompt { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        #admin-login-prompt input { padding: 10px; width: 250px; }
+        #admin-login-prompt button { margin-top: 10px; }
+
+    </style>
+    <!-- Monetag Ad Script -->
+    <script src='//libtl.com/sdk.js' data-zone='9835962' data-sdk='show_9835962'></script>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="screen active">
+            <h1>Mystery Box</h1>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar">0%</div>
+            </div>
+        </div>
+
+        <!-- Login Screen -->
+        <div id="login-screen" class="screen">
+            <h1>Welcome to Mystery Box</h1>
+            <p>Sign in to start earning rewards!</p>
+            <button id="login-button" class="btn">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/><path d="M1 1h22v22H1z" fill="none"/></svg>
+                Sign in with Google
+            </button>
+        </div>
+
+        <!-- Main App Screen (Container for other screens) -->
+        <div id="app-container" class="screen">
+            <div class="header">
+                 <div class="resources">
+                    <div class="resource-item">🪙 <span id="coins-display">0</span></div>
+                    <div class="resource-item">💎 <span id="diamonds-display">0</span></div>
+                    <div class="resource-item">⚡ <span id="spins-display">0</span></div>
+                </div>
+                <button id="admin-panel-button" class="btn btn-secondary" style="display:none; padding: 5px 10px;">Admin</button>
+            </div>
+            <div class="main-content" id="main-content-area">
+                <!-- Content injected by JS -->
+            </div>
+            <div class="nav-bar">
+                <button class="nav-btn active" data-page="spin">Spin</button>
+                <button class="nav-btn" data-page="redeem">Redeem</button>
+                <button class="nav-btn" data-page="leaderboard">Leaderboard</button>
+                <button class="nav-btn" data-page="profile">Profile</button>
+            </div>
+        </div>
+
+        <!-- Admin Panel -->
+        <div id="admin-panel" class="screen">
+            <div class="header">
+                <h2>Admin Panel</h2>
+                <button id="exit-admin-button" class="btn btn-secondary">Exit Admin</button>
+            </div>
+            <div class="main-content">
+                <div class="admin-filter-btns">
+                    <button class="btn btn-secondary" data-filter="pending">Pending</button>
+                    <button class="btn btn-secondary" data-filter="approved">Approved</button>
+                    <button class="btn btn-secondary" data-filter="rejected">Rejected</button>
+                    <button class="btn btn-secondary" data-filter="all">All</button>
+                </div>
+                <h3>Redemption Requests</h3>
+                <div id="admin-requests-list"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // --- IMPORTANT CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCyghQGzHtwq5ot1RiJtqpRePHW3AeRva4",
+            authDomain: "mistry-box.firebaseapp.com",
+            databaseURL: "https://mistry-box-default-rtdb.firebaseio.com",
+            projectId: "mistry-box",
+            storageBucket: "mistry-box.firebasestorage.app",
+            messagingSenderId: "811100354638",
+            appId: "1:811100354638:web:10b729dcbe9af3cdcf2b1f"
+        };
+        // ⬇️ REPLACE with your admin account's Google UID from Firebase Auth
+        const ADMIN_UIDS = ["REPLACE_WITH_YOUR_GOOGLE_UID"];
+        // --- END CONFIGURATION ---
+
+        /* 
+        --- RECOMMENDED FIREBASE REALTIME DATABASE RULES ---
+        {
+          "rules": {
+            "users": {
+              "$uid": {
+                ".read": "auth != null",
+                ".write": "auth != null && auth.uid === $uid"
+              }
+            },
+            "leaderboard": {
+                ".read": "auth != null",
+                 ".indexOn": "coins"
+            },
+            "redeemRequests": {
+               ".read": "auth != null",
+               "$reqId": {
+                 // Users can write their own new requests
+                 ".write": "auth != null && (!data.exists() || data.child('uid').val() === auth.uid)",
+                 // Admins can write status updates
+                 "status": { ".write": "root.child('users').child(auth.uid).child('isAdmin').val() === true" },
+                 "adminNote": { ".write": "root.child('users').child(auth.uid).child('isAdmin').val() === true" },
+                 "approvedAt": { ".write": "root.child('users').child(auth.uid).child('isAdmin').val() === true" },
+                 "giftCardCode": { ".write": "root.child('users').child(auth.uid).child('isAdmin').val() === true" }
+               }
+            },
+             "notifications": {
+              "$uid": {
+                  ".read": "auth != null && auth.uid === $uid",
+                  // Only admin can write notifications
+                  ".write": "root.child('users').child(auth.uid).child('isAdmin').val() === true"
+              }
+             }
+          }
+        }
+        */
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const database = firebase.database();
+
+        // DOM Elements
+        const screens = document.querySelectorAll('.screen');
+        const mainContentArea = document.getElementById('main-content-area');
+
+        // State variables
+        let currentUser = null;
+        let userData = null;
+        let isSpinning = false;
+
+        // --- CORE APP FLOW ---
+
+        function updateView(viewName) {
+            screens.forEach(screen => {
+                screen.classList.toggle('active', screen.id === viewName);
+            });
+        }
+
+        function simulateLoading() {
+            let progress = 0;
+            const progressBar = document.getElementById('progress-bar');
+            const interval = setInterval(() => {
+                progress += Math.floor(Math.random() * 10) + 5;
+                if (progress > 100) progress = 100;
+                progressBar.style.width = progress + '%';
+                progressBar.textContent = progress + '%';
+                if (progress === 100) {
+                    clearInterval(interval);
+                    setTimeout(() => auth.onAuthStateChanged(handleAuthStateChange), 500);
+                }
+            }, 200);
+        }
+
+        function handleAuthStateChange(user) {
+            if (user) {
+                currentUser = user;
+                fetchUserData(user.uid);
+            } else {
+                currentUser = null;
+                userData = null;
+                updateView('login-screen');
+            }
+        }
+        
+        async function fetchUserData(uid) {
+            try {
+                const userRef = database.ref('users/' + uid);
+                const snapshot = await userRef.once('value');
+                if (snapshot.exists()) {
+                    userData = snapshot.val();
+                } else {
+                    await createNewUser(currentUser);
+                }
+                await checkDailyLogin();
+                initializeAppUI();
+            } catch (error) {
+                console.error("Error fetching user data:", error);
+                alert("Could not fetch your data. Please check your connection.");
+            }
+        }
+
+        async function createNewUser(user) {
+            const newUser = {
+                displayName: user.displayName,
+                email: user.email,
+                photoURL: user.photoURL,
+                coins: 100, diamonds: 0, spins: 1,
+                lastLoginDate: '1970-01-01',
+                streakCount: 0,
+                createdAt: firebase.database.ServerValue.TIMESTAMP,
+                isAdmin: ADMIN_UIDS.includes(user.uid)
+            };
+            await database.ref('users/' + user.uid).set(newUser);
+            userData = newUser;
+        }
+
+        async function checkDailyLogin() {
+            const today = new Date().toISOString().split('T')[0];
+            if (userData.lastLoginDate !== today) {
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+                if (userData.lastLoginDate === yesterdayStr) {
+                    userData.streakCount++;
+                } else {
+                    userData.streakCount = 1;
+                }
+
+                if (userData.streakCount >= 7) {
+                    userData.diamonds++;
+                    userData.streakCount = 0;
+                    alert("Congratulations! 7-day streak complete. You earned 1 💎!");
+                }
+                
+                userData.spins = (userData.spins || 0) + 1; // Grant daily spin
+                userData.lastLoginDate = today;
+                await updateUserData();
+            }
+        }
+
+        function initializeAppUI() {
+            updateView('app-container');
+            if (userData.isAdmin) {
+                document.getElementById('admin-panel-button').style.display = 'block';
+            }
+            updateResourceDisplays();
+            navigateTo('spin');
+        }
+
+        function updateResourceDisplays() {
+            if (!userData) return;
+            document.getElementById('coins-display').textContent = userData.coins;
+            document.getElementById('diamonds-display').textContent = userData.diamonds;
+            document.getElementById('spins-display').textContent = userData.spins;
+        }
+
+        function updateUserData() {
+            if (currentUser && userData) {
+                return database.ref('users/' + currentUser.uid).set(userData);
+            }
+            return Promise.resolve();
+        }
+
+        // --- NAVIGATION ---
+
+        const pageRenderers = {
+            'spin': renderSpinPage,
+            'redeem': renderRedeemPage,
+            'leaderboard': renderLeaderboardPage,
+            'profile': renderProfilePage,
+        };
+
+        function navigateTo(page) {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.page === page);
+            });
+            const renderer = pageRenderers[page];
+            if (renderer) {
+                renderer();
+            }
+        }
+
+        // --- PAGE RENDERERS ---
+
+        function renderSpinPage() {
+            mainContentArea.innerHTML = `
+                <div class="spin-area">
+                    <div class="wheel-container">
+                        <div class="pointer"></div>
+                        <div class="wheel" id="wheel"></div>
+                    </div>
+                    <button class="btn btn-primary spin-button" id="spin-button">SPIN</button>
+                    <button class="extra-spin-button" id="extra-spin-button">Watch Ad for 1 Extra Spin</button>
+                </div>
+                <div class="card">
+                    <h3>Daily Login Streak</h3>
+                    <p>Login for 7 consecutive days to get 1 💎!</p>
+                    <div class="streak-days" id="streak-days"></div>
+                </div>
+            `;
+            updateStreakUI();
+            updateSpinButtonState();
+            document.getElementById('spin-button').addEventListener('click', handleSpin);
+            document.getElementById('extra-spin-button').addEventListener('click', handleExtraSpin);
+        }
+        
+        function renderRedeemPage() {
+             mainContentArea.innerHTML = `
+                <div class="card">
+                    <h3>Redeem Coins</h3>
+                    <p>Redeem your coins for Google Play Gift Cards. Please note: Requests are processed manually by an admin and may take up to 3 hours.</p>
+                    <div id="redeem-tiers-list"></div>
+                </div>
+            `;
+            displayRedeemTiers();
+        }
+
+        async function renderLeaderboardPage() {
+             mainContentArea.innerHTML = `<div class="card"><h3>🏆 Top 10 Players</h3><div id="leaderboard-list">Loading...</div></div>`;
+             try {
+                const snapshot = await database.ref('users').orderByChild('coins').limitToLast(10).once('value');
+                const leaderboardData = [];
+                snapshot.forEach(child => { leaderboardData.push(child.val()); });
+                leaderboardData.reverse();
+                
+                const listEl = document.getElementById('leaderboard-list');
+                listEl.innerHTML = '';
+                if(leaderboardData.length > 0) {
+                    leaderboardData.forEach((player, index) => {
+                        listEl.innerHTML += `
+                            <div class="list-item">
+                                <span class="rank">${index + 1}</span>
+                                <span class="name">${player.displayName}</span>
+                                <span class="coins">🪙 ${player.coins}</span>
+                            </div>
+                        `;
+                    });
+                } else {
+                    listEl.innerHTML = '<p>No players on the board yet.</p>';
+                }
+             } catch (error) {
+                console.error("Error fetching leaderboard:", error);
+                document.getElementById('leaderboard-list').innerHTML = '<p>Could not load leaderboard.</p>';
+             }
+        }
+        
+        function renderProfilePage() {
+            mainContentArea.innerHTML = `
+                <div class="card" id="profile-info">
+                    <h3>Profile</h3>
+                    <div class="info-item"><span>Name:</span> <span>${userData.displayName}</span></div>
+                    <div class="info-item"><span>Email:</span> <span>${userData.email}</span></div>
+                    <div class="info-item"><span>UID:</span> <span>${currentUser.uid}</span></div>
+                    <button id="logout-button" class="btn btn-danger" style="width: 100%; margin-top: 20px;">Logout</button>
+                </div>
+                <div class="card">
+                    <h3>Redemption History</h3>
+                    <div id="redeem-history-list">Loading...</div>
+                </div>
+            `;
+            document.getElementById('logout-button').addEventListener('click', handleLogout);
+            fetchAndDisplayHistory();
+        }
+
+        // --- AUTHENTICATION ---
+
+        document.getElementById('login-button').addEventListener('click', () => {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(error => {
+                console.error("Login failed:", error);
+                alert("Login failed. Please try again.");
+            });
+        });
+
+        function handleLogout() {
+            auth.signOut();
+        }
+
+        // --- SPIN WHEEL ---
+
+        function updateSpinButtonState() {
+             const spinButton = document.getElementById('spin-button');
+             if(spinButton) {
+                 spinButton.disabled = isSpinning || userData.spins <= 0;
+                 spinButton.textContent = isSpinning ? "SPINNING..." : "SPIN";
+             }
+        }
+
+        function handleSpin() {
+            if (isSpinning || userData.spins <= 0) return;
+            isSpinning = true;
+            userData.spins--;
+            updateUserData();
+            updateResourceDisplays();
+            updateSpinButtonState();
+            
+            const rewards = [
+                { value: '10 coins', probability: 0.40, reward: { type: 'coins', amount: 10 } },
+                { value: '20 coins', probability: 0.30, reward: { type: 'coins', amount: 20 } },
+                { value: '50 coins', probability: 0.15, reward: { type: 'coins', amount: 50 } },
+                { value: '100 coins', probability: 0.10, reward: { type: 'coins', amount: 100 } },
+                { value: 'Empty', probability: 0.05, reward: { type: 'empty', amount: 0 } },
+                { value: '200 coins', probability: 0.049, reward: { type: 'coins', amount: 200 } },
+                { value: '1 Diamond', probability: 0.001, reward: { type: 'diamonds', amount: 1 } }
+            ];
+            
+            // Weighted random selection
+            const rand = Math.random();
+            let cumulativeProbability = 0;
+            const winningReward = rewards.find(r => {
+                cumulativeProbability += r.probability;
+                return rand < cumulativeProbability;
+            }) || rewards[4]; // Fallback to Empty
+
+            const totalSegments = rewards.length;
+            const segmentAngle = 360 / totalSegments;
+            const winningSegmentIndex = rewards.indexOf(winningReward);
+            const randomOffset = (Math.random() * segmentAngle) - (segmentAngle / 2);
+            const stopAngle = (winningSegmentIndex * segmentAngle) + randomOffset;
+            const totalRotation = (360 * 5) + stopAngle;
+
+            const wheel = document.getElementById('wheel');
+            wheel.style.transition = 'transform 5s cubic-bezier(0.25, 0.1, 0.25, 1)';
+            wheel.style.transform = `rotate(${totalRotation}deg)`;
+            
+            setTimeout(() => {
+                isSpinning = false;
+                alert(`You won: ${winningReward.value}!`);
+                processReward(winningReward.reward);
+
+                if (typeof show_9835962 === 'function') {
+                    show_9835962({ "type": "interstitial" });
+                }
+
+                updateSpinButtonState();
+                const finalRotation = totalRotation % 360;
+                wheel.style.transition = 'none';
+                wheel.style.transform = `rotate(${finalRotation}deg)`;
+            }, 5500);
+        }
+
+        function processReward(reward) {
+            if (reward.type === 'coins') userData.coins += reward.amount;
+            else if (reward.type === 'diamonds') userData.diamonds += reward.amount;
+            updateUserData();
+            updateResourceDisplays();
+        }
+
+        function handleExtraSpin() {
+            if (typeof show_9835962 === 'function') {
+                show_9835962({
+                    "type": "rewarded",
+                    "onComplete": function(result) {
+                        if (result.rewarded) {
+                            userData.spins++;
+                            updateUserData();
+                            updateResourceDisplays();
+                            updateSpinButtonState();
+                            alert("You've received 1 extra spin!");
+                        } else {
+                            alert("You need to watch the full ad to get a reward.");
+                        }
+                    }
+                });
+            } else {
+                alert("Ad service is not available right now.");
+            }
+        }
+        
+        function updateStreakUI() {
+            const streakContainer = document.getElementById('streak-days');
+            if(!streakContainer) return;
+            streakContainer.innerHTML = '';
+            for(let i=1; i<=7; i++) {
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'day';
+                dayDiv.textContent = i;
+                if(i <= userData.streakCount) {
+                    dayDiv.classList.add('active');
+                }
+                streakContainer.appendChild(dayDiv);
+            }
+        }
+
+        // --- REDEMPTION SYSTEM ---
+
+        const redeemTiers = {
+            'tier10': { label: '₹10 Google Play Card', cost: 1800 },
+            'tier20': { label: '₹20 Google Play Card', cost: 3600 },
+            'tier50': { label: '₹50 Google Play Card', cost: 9000 },
+        };
+
+        async function displayRedeemTiers() {
+            const listEl = document.getElementById('redeem-tiers-list');
+            listEl.innerHTML = '';
+
+            const pendingRequestsSnapshot = await database.ref('redeemRequests')
+                .orderByChild('uid').equalTo(currentUser.uid).once('value');
+            const pendingTiers = [];
+            pendingRequestsSnapshot.forEach(snap => {
+                const req = snap.val();
+                if(req.status === 'pending') {
+                    pendingTiers.push(req.tierKey);
+                }
+            });
+
+            for (const key in redeemTiers) {
+                const tier = redeemTiers[key];
+                const hasEnoughCoins = userData.coins >= tier.cost;
+                const isPending = pendingTiers.includes(key);
+                const canRedeem = hasEnoughCoins && !isPending;
+
+                const tierEl = document.createElement('div');
+                tierEl.className = 'list-item redeem-tier';
+                tierEl.innerHTML = `
+                    <div class="details">
+                        <strong>${tier.label}</strong>
+                        <p>Cost: 🪙 ${tier.cost}</p>
+                    </div>
+                    <button class="btn btn-primary" data-tier-key="${key}" ${!canRedeem ? 'disabled' : ''}>
+                        ${isPending ? 'Pending' : 'Redeem'}
+                    </button>
+                `;
+                listEl.appendChild(tierEl);
+            }
+            listEl.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', () => handleRedeemRequest(btn.dataset.tierKey));
+            });
+        }
+
+        async function handleRedeemRequest(tierKey) {
+            const tier = redeemTiers[tierKey];
+            if (!tier || userData.coins < tier.cost) {
+                alert("You don't have enough coins or this tier is invalid.");
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to spend ${tier.cost} coins for a ${tier.label}? This action cannot be undone.`)) {
+                return;
+            }
+
+            const redeemButton = document.querySelector(`button[data-tier-key="${tierKey}"]`);
+            redeemButton.disabled = true;
+            redeemButton.textContent = 'Processing...';
+
+            const newRequestRef = database.ref('redeemRequests').push();
+            const newRequestId = newRequestRef.key;
+            
+            const requestData = {
+                uid: currentUser.uid,
+                displayName: userData.displayName,
+                amountCoins: tier.cost,
+                tierLabel: tier.label,
+                tierKey: tierKey,
+                createdAt: firebase.database.ServerValue.TIMESTAMP,
+                status: 'pending',
+            };
+
+            const updates = {};
+            updates[`/redeemRequests/${newRequestId}`] = requestData;
+            updates[`/users/${currentUser.uid}/redeemHistory/${newRequestId}`] = true;
+            updates[`/users/${currentUser.uid}/coins`] = userData.coins - tier.cost;
+
+            try {
+                await database.ref().update(updates);
+                userData.coins -= tier.cost;
+                alert("Request submitted! An admin will review it shortly. You can check the status in your profile.");
+                updateResourceDisplays();
+                displayRedeemTiers();
+            } catch (error) {
+                console.error("Redemption failed:", error);
+                alert("An error occurred. Your request could not be submitted. Please try again.");
+                redeemButton.disabled = false;
+                redeemButton.textContent = 'Redeem';
+            }
+        }
+        
+        async function fetchAndDisplayHistory() {
+            const historyListEl = document.getElementById('redeem-history-list');
+            if(!historyListEl) return;
+
+            const historyRef = database.ref('users/' + currentUser.uid + '/redeemHistory');
+            const historySnapshot = await historyRef.once('value');
+            if(!historySnapshot.exists()) {
+                historyListEl.innerHTML = '<p>No redemption history found.</p>';
+                return;
+            }
+
+            historyListEl.innerHTML = '';
+            const requestIds = Object.keys(historySnapshot.val());
+            requestIds.reverse(); // Show most recent first
+
+            for(const reqId of requestIds) {
+                const reqSnapshot = await database.ref('redeemRequests/' + reqId).once('value');
+                if(reqSnapshot.exists()) {
+                    const req = reqSnapshot.val();
+                    const reqDate = new Date(req.createdAt).toLocaleString();
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'history-item list-item';
+                    itemEl.innerHTML = `
+                        <div>
+                            <strong>${req.tierLabel}</strong>
+                            <small>${reqDate}</small>
+                            ${req.status === 'approved' && req.giftCardCode ? `<p>Code: <span class="gift-code">${req.giftCardCode}</span></p>` : ''}
+                             ${req.adminNote ? `<p><small>Admin Note: ${req.adminNote}</small></p>` : ''}
+                        </div>
+                        <strong class="status-${req.status}">${req.status}</strong>
+                    `;
+                    historyListEl.appendChild(itemEl);
+                }
+            }
+        }
+
+
+        // --- ADMIN PANEL ---
+
+        document.getElementById('admin-panel-button').addEventListener('click', () => {
+            updateView('admin-panel');
+            fetchAdminRequests('pending');
+        });
+
+        document.getElementById('exit-admin-button').addEventListener('click', () => updateView('app-container'));
+        
+        document.querySelectorAll('.admin-filter-btns button').forEach(btn => {
+            btn.addEventListener('click', () => fetchAdminRequests(btn.dataset.filter));
+        });
+
+        async function fetchAdminRequests(filter = 'pending') {
+            const listEl = document.getElementById('admin-requests-list');
+            listEl.innerHTML = 'Loading requests...';
+
+            let query = database.ref('redeemRequests').orderByChild('createdAt');
+            const snapshot = await query.once('value');
+            
+            const requests = [];
+            snapshot.forEach(snap => { requests.push({ id: snap.key, ...snap.val() }); });
+            requests.reverse(); // Newest first
+
+            listEl.innerHTML = '';
+            const filteredRequests = (filter === 'all') ? requests : requests.filter(r => r.status === filter);
+            
+            if(filteredRequests.length === 0) {
+                 listEl.innerHTML = `<p>No ${filter} requests found.</p>`;
+                 return;
+            }
+            
+            filteredRequests.forEach(req => {
+                const reqDate = new Date(req.createdAt).toLocaleString();
+                const itemEl = document.createElement('div');
+                itemEl.className = 'admin-request-item';
+                itemEl.innerHTML = `
+                    <p><strong>Request ID:</strong> ${req.id}</p>
+                    <p><strong>User:</strong> ${req.displayName} (${req.uid})</p>
+                    <p><strong>Item:</strong> ${req.tierLabel} (Cost: ${req.amountCoins})</p>
+                    <p><strong>Date:</strong> ${reqDate}</p>
+                    <p><strong>Status:</strong> ${req.status}</p>
+                    <div class="admin-actions" data-req-id="${req.id}" data-uid="${req.uid}" data-cost="${req.amountCoins}">
+                        ${req.status === 'pending' ? `
+                        <button class="btn btn-approve">Approve</button>
+                        <button class="btn btn-reject">Reject</button>
+                        ` : ''}
+                    </div>
+                `;
+                listEl.appendChild(itemEl);
+            });
+
+            listEl.querySelectorAll('.btn-approve').forEach(btn => btn.addEventListener('click', handleApproveClick));
+            listEl.querySelectorAll('.btn-reject').forEach(btn => btn.addEventListener('click', handleRejectClick));
+        }
+
+        async function handleApproveClick(e) {
+            const actionsDiv = e.target.parentElement;
+            const reqId = actionsDiv.dataset.reqId;
+            const uid = actionsDiv.dataset.uid;
+
+            const giftCode = prompt("Enter the Google Play Gift Card code:");
+            if (!giftCode) return;
+            const adminNote = prompt("Enter an optional note for the user (e.g., receipt link):");
+            
+            try {
+                const updates = {};
+                updates[`/redeemRequests/${reqId}/status`] = 'approved';
+                updates[`/redeemRequests/${reqId}/giftCardCode`] = giftCode;
+                updates[`/redeemRequests/${reqId}/adminNote`] = adminNote || '';
+                updates[`/redeemRequests/${reqId}/approvedAt`] = firebase.database.ServerValue.TIMESTAMP;
+                
+                // Send notification
+                const notifRef = database.ref(`notifications/${uid}`).push();
+                updates[`/notifications/${uid}/${notifRef.key}`] = {
+                    title: "Redemption Approved!",
+                    message: `Your request for a ${redeemTiers[actionsDiv.dataset.tierKey]?.label || 'gift card'} has been approved! Your code is: ${giftCode}`,
+                    createdAt: firebase.database.ServerValue.TIMESTAMP,
+                    read: false,
+                };
+
+                await database.ref().update(updates);
+                alert('Request approved and notification sent.');
+                fetchAdminRequests('pending');
+            } catch (error) {
+                console.error("Approval failed:", error);
+                alert("Failed to approve request.");
+            }
+        }
+        
+        async function handleRejectClick(e) {
+             const actionsDiv = e.target.parentElement;
+             const reqId = actionsDiv.dataset.reqId;
+             const uid = actionsDiv.dataset.uid;
+             const cost = parseInt(actionsDiv.dataset.cost);
+             
+             const reason = prompt("Enter the reason for rejection:");
+             if (!reason) return;
+             const shouldRefund = confirm("Do you want to refund the coins to the user?");
+
+             try {
+                const updates = {};
+                updates[`/redeemRequests/${reqId}/status`] = 'rejected';
+                updates[`/redeemRequests/${reqId}/adminNote`] = reason;
+
+                if(shouldRefund) {
+                   const userCoinsRef = database.ref(`users/${uid}/coins`);
+                   await userCoinsRef.transaction(currentCoins => (currentCoins || 0) + cost);
+                }
+                
+                const notifRef = database.ref(`notifications/${uid}`).push();
+                updates[`/notifications/${uid}/${notifRef.key}`] = {
+                    title: "Redemption Rejected",
+                    message: `Your redemption request was rejected. Reason: ${reason}.` + (shouldRefund ? ` Your ${cost} coins have been refunded.` : ''),
+                    createdAt: firebase.database.ServerValue.TIMESTAMP,
+                    read: false,
+                };
+                
+                await database.ref().update(updates);
+                alert('Request rejected.');
+                fetchAdminRequests('pending');
+             } catch(error) {
+                 console.error("Rejection failed:", error);
+                 alert("Failed to reject request.");
+             }
+        }
+
+
+        // --- EVENT LISTENERS ---
+
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => navigateTo(btn.dataset.page));
+        });
+
+        // --- APP INITIALIZATION ---
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.ready();
+        }
+        simulateLoading();
+    });
+    </script>
+</body>
+</html>
